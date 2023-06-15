@@ -30,7 +30,8 @@ mongoose.connect('mongodb://127.0.0.1:27017/userDB');
 const userSchema = new mongoose.Schema({
     username: String,
     password: String,
-    googleId: String
+    googleId: String,
+    secret: String
 });
 
 userSchema.plugin(passportLocalMongoose);
@@ -50,11 +51,24 @@ passport.serializeUser(function(user, cb) {
     });
   });
   
-  passport.deserializeUser(function(user, cb) {
+passport.deserializeUser(function(user, cb) {
     process.nextTick(function() {
-      return cb(null, user);
+        return cb(null, user);
     });
-  });
+});
+
+// passport.serializeUser(function(user, cb) {
+//     process.nextTick(function() {
+//       return cb(null, user.id);
+//     });
+// });
+  
+// passport.deserializeUser(function(id, cb) {
+//     db.get('SELECT * FROM users WHERE id = ?', [ id ], function(err, user) {
+//       if (err) { return cb(err); }
+//       return cb(null, user);
+//     });
+// });
 
 passport.use(new GoogleStrategy({
     clientID: process.env.CLIENT_ID,
@@ -94,11 +108,42 @@ app.get("/register", function (req, res) {
 });
 
 app.get("/secrets", function(req, res) {
+    // if (req.isAuthenticated()) {
+    //     res.render("secrets");
+    // } else {
+    //     res.redirect("/login");
+    // }
+    User.find({"secret": {$ne: null}}).then(function(foundUsers) {
+        if (foundUsers) {
+            res.render("secrets", {userWithSecrets: foundUsers});
+        }
+    }).catch(function(err) {
+        console.log(err);
+    });
+});
+
+app.get("/submit", function(req, res) {
     if (req.isAuthenticated()) {
-        res.render("secrets");
+        res.render("submit");
     } else {
         res.redirect("/login");
     }
+});
+
+app.post("/submit", function(req, res) {
+    const submittedSecret = req.body.secret;
+    // console.log(req.user.id);
+
+    User.findById(req.user.id).then(function(foundUser) {
+        if (foundUser) {
+            foundUser.secret = submittedSecret;
+            foundUser.save().then(function() {
+                res.redirect("/secrets");
+            });
+        }
+    }).catch(function(err) {
+        console.log(err);
+    });
 });
 
 app.get("/logout", function(req, res) {
